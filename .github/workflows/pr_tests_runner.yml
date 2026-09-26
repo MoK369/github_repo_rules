@@ -1,0 +1,44 @@
+name: Flutter Running PR Tests
+on:
+  pull_request:
+    types: [ opened, edited, synchronize ]
+    branches:
+      - '**'
+jobs:
+  build:
+    name: PR Tests Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.4'
+
+      - name: Create .env file
+        run: |
+          mkdir -p config
+          echo "${{ secrets.ENV_FILE }}" > config/.env
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate files with build_runner
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Check for test files
+        id: check_tests
+        run: |
+          if [ -z "$(find test -name '*_test.dart')" ]; then
+            echo "No test files found."
+            echo "run_tests=false" >> $GITHUB_OUTPUT
+          else
+            echo "Test files found."
+            echo "run_tests=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run tests
+        if: steps.check_tests.outputs.run_tests == 'true'
+        run: flutter test
