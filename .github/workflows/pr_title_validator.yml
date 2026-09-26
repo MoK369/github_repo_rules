@@ -5,7 +5,6 @@ on:
     branches:
       - '**'
 jobs:
-
   check-pr-title:
     name: Check PR Title
     runs-on: ubuntu-latest
