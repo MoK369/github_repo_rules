@@ -1,0 +1,73 @@
+name: Code Check By Dart Linter (on Push or PR)
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    types: [ opened, edited, synchronize ]
+    branches:
+      - '**'
+jobs:
+  analyze:
+    name: Dart Linter Analyze
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT }}    # very important
+          fetch-depth: 0               # required for pushing
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.6'
+
+      - name: Print Dart and Flutter versions
+        run: |
+          dart --version
+          flutter --version
+
+      - name: Create .env file
+        run: |
+          mkdir -p config
+          echo "${{ secrets.ENV_FILE }}" > config/.env
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze code
+        run: flutter analyze
+
+      - name: Format code
+        run: dart format .
+
+      - name: Check for changes
+        id: check_changes
+        run: |
+          if git diff --quiet; then
+            echo "No changes detected."
+            echo "commit_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "Changes detected."
+            echo "commit_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get current branch name
+        id: get_branch
+        run: |
+          echo "GITHUB_REF=${GITHUB_REF}"
+          echo "branch_name=$(echo ${GITHUB_REF#refs/heads/})" >> $GITHUB_ENV
+          echo "Branch name: $(echo ${GITHUB_REF#refs/heads/})"
+
+      - name: Commit changes
+        if: steps.check_changes.outputs.commit_changes == 'true'
+        env:
+          PAT: ${{ secrets.PAT }}
+        run: |
+          git config --global user.email "bot@example.com"
+          git config --global user.name "GitHub Bot"
+          git remote set-url origin https://$PAT@github.com/${{ github.repository }}.git
+          git add .
+          git commit -m "Automated code formatting" || echo "No changes to commit"
+          git push origin HEAD
